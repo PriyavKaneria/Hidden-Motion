@@ -716,7 +716,6 @@
 
                 const scaleX = this.canvas.width / this.motionData.width;
                 const scaleY = this.canvas.height / this.motionData.height;
-                const currentTime = Date.now();
 
                 if (regions.length > 0) {
                     let sumX = 0, sumY = 0;
@@ -767,10 +766,7 @@
                     if (this.frameCounter % this.trailUpdateInterval === 0) {
                         const x_displayed = this.canvas.width - avgX;
                         const y_displayed = avgY;
-                        this.trailPoints.push({ x: x_displayed, y: y_displayed, frame: this.frameCounter });
-                        if (this.trailPoints.length > 50) {
-                            this.trailPoints.shift();
-                        }
+                        this.trailPoints.push({ x: x_displayed, y: y_displayed, timestamp: Date.now() });
                         this.lastTrailUpdateFrame = this.frameCounter;
                     }
                 }
@@ -780,28 +776,25 @@
             }
 
             updateTrail() {
+                const now = Date.now();
+                const maxAge = 5000; // Trails disappear after 5 seconds
+                this.trailPoints = this.trailPoints.filter(point => now - point.timestamp < maxAge);
+
                 this.trailSvg.innerHTML = '';
-                if (this.trailPoints.length < 2) return;
-
-                const framesSinceUpdate = this.frameCounter - this.lastTrailUpdateFrame;
-                const opacity = Math.max(0, 1 - framesSinceUpdate / 60);
-
-                if (opacity > 0) {
-                    let pathData = `M ${this.trailPoints[0].x} ${this.trailPoints[0].y}`;
-                    if (this.trailPoints.length >= 3) {
-                        pathData += ` Q ${this.trailPoints[1].x} ${this.trailPoints[1].y} ${this.trailPoints[2].x} ${this.trailPoints[2].y}`;
-                        for (let i = 3; i < this.trailPoints.length; i++) {
-                            pathData += ` T ${this.trailPoints[i].x} ${this.trailPoints[i].y}`;
+                if (this.trailPoints.length >= 2) {
+                    for (let i = 0; i < this.trailPoints.length - 1; i++) {
+                        const point1 = this.trailPoints[i];
+                        const point2 = this.trailPoints[i + 1];
+                        const age = now - point1.timestamp;
+                        const opacity = Math.max(0, 1 - age / maxAge);
+                        if (opacity > 0) {
+                            const path = document.createElementNS('http://www.w3.org/2000/svg', 'path');
+                            path.setAttribute('d', `M ${point1.x} ${point1.y} L ${point2.x} ${point2.y}`);
+                            path.classList.add('trail-line');
+                            path.style.opacity = opacity;
+                            this.trailSvg.appendChild(path);
                         }
-                    } else {
-                        pathData += ` L ${this.trailPoints[1].x} ${this.trailPoints[1].y}`;
                     }
-
-                    const path = document.createElementNS('http://www.w3.org/2000/svg', 'path');
-                    path.setAttribute('d', pathData);
-                    path.classList.add('trail-line');
-                    path.style.opacity = opacity;
-                    this.trailSvg.appendChild(path);
                 }
             }
 
@@ -1003,7 +996,7 @@
 
             bgShift += 0.0002;
             let gradient = ctx.createLinearGradient(0, 0, canvas.width, canvas.height);
-            gradient.addColorStop(0, `rgb(${30 + Math.sin(bgShift) * 10}, 10, 20)`);
+            gradient.addColorStop(0, `rgb(${30 + Math.sin(bgShift) * 0}, 10, 20)`);
             gradient.addColorStop(0.5, "#0A0A1E");
             gradient.addColorStop(1, `rgb(5, 5, ${40 + Math.sin(bgShift) * 10})`);
             ctx.fillStyle = gradient;
