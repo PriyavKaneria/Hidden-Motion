@@ -1,0 +1,611 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Hidden Motion</title>
+    <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400;700&display=swap" rel="stylesheet">
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            overflow: hidden;
+            font-family: 'Orbitron', monospace;
+            background: #000;
+            color: white;
+        }
+
+        .title {
+            position: fixed;
+            top: 20px;
+            left: 20px;
+            font-size: 28px;
+            font-weight: 700;
+            color: white;
+            z-index: 1000;
+            pointer-events: none;
+            letter-spacing: 2px;
+        }
+
+        #canvas {
+            display: block;
+            width: 100vw;
+            height: 100vh;
+            background: #000;
+        }
+
+        .settings-panel {
+            position: fixed;
+            top: 0;
+            right: 0;
+            width: 320px;
+            height: 100vh;
+            background: rgba(20, 20, 20, 0.95);
+            backdrop-filter: blur(10px);
+            border-left: 2px solid #333;
+            transform: translateX(280px);
+            transition: transform 0.3s ease;
+            z-index: 999;
+        }
+
+        .settings-panel.open {
+            transform: translateX(0);
+        }
+
+        .settings-toggle {
+            position: absolute;
+            left: -40px;
+            top: 50%;
+            transform: translateY(-50%);
+            width: 40px;
+            height: 80px;
+            background: rgba(20, 20, 20, 0.95);
+            border: 2px solid #333;
+            border-right: none;
+            border-radius: 8px 0 0 8px;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: white;
+            font-size: 18px;
+        }
+
+        .settings-content {
+            padding: 20px;
+            height: 100%;
+            overflow-y: auto;
+        }
+
+        .settings-title {
+            font-size: 18px;
+            margin-bottom: 20px;
+            color: #fff;
+            border-bottom: 1px solid #333;
+            padding-bottom: 10px;
+        }
+
+        .setting-group {
+            margin-bottom: 25px;
+        }
+
+        .setting-label {
+            display: block;
+            margin-bottom: 8px;
+            font-size: 14px;
+            color: #ccc;
+        }
+
+        .setting-control {
+            width: 100%;
+        }
+
+        select, input[type="color"] {
+            width: 100%;
+            padding: 8px;
+            background: #333;
+            border: 1px solid #555;
+            border-radius: 4px;
+            color: white;
+            font-family: 'Orbitron', monospace;
+        }
+
+        .checkbox-container {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        input[type="checkbox"] {
+            width: 18px;
+            height: 18px;
+            cursor: pointer;
+        }
+
+        .no-camera-screen {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100vw;
+            height: 100vh;
+            background: #000;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            text-align: center;
+            z-index: 500;
+        }
+
+        .camera-images {
+            display: flex;
+            gap: 40px;
+            margin-bottom: 30px;
+        }
+
+        .camera-placeholder {
+            width: 200px;
+            height: 150px;
+            background: #333;
+            border: 2px dashed #666;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            border-radius: 8px;
+            font-size: 14px;
+            color: #999;
+        }
+
+        .camera-description {
+            max-width: 600px;
+            font-size: 16px;
+            line-height: 1.6;
+            margin-bottom: 30px;
+            color: #ccc;
+        }
+
+        .camera-arrow {
+            font-size: 48px;
+            color: #fff;
+            animation: pulse 2s infinite;
+        }
+
+        @keyframes pulse {
+            0%, 100% { opacity: 0.5; }
+            50% { opacity: 1; }
+        }
+
+        .hidden {
+            display: none !important;
+        }
+
+        .marker {
+            position: absolute;
+            border: 2px solid #ff0000;
+            background: rgba(255, 0, 0, 0.2);
+            pointer-events: none;
+            z-index: 100;
+        }
+
+        .velocity-indicator {
+            position: absolute;
+            width: 2px;
+            background: #00ff00;
+            transform-origin: center;
+            pointer-events: none;
+            z-index: 101;
+        }
+    </style>
+</head>
+<body>
+    <div class="title">Hidden Motion</div>
+    
+    <canvas id="canvas"></canvas>
+    
+    <div class="no-camera-screen" id="noCameraScreen">
+        <div class="camera-images">
+            <div class="camera-placeholder">
+                Normal View<br>
+                <small>Static scene appears unchanged</small>
+            </div>
+            <div class="camera-placeholder">
+                Motion Detection<br>
+                <small>Hidden movements revealed</small>
+            </div>
+        </div>
+        <div class="camera-description">
+            This application reveals hidden motion by analyzing frame differences in your camera feed. 
+            Subtle movements invisible to the naked eye become clearly visible as white regions against a black background.
+            Please allow camera access to begin motion detection.
+        </div>
+        <div class="camera-arrow">↗</div>
+    </div>
+
+    <div class="settings-panel" id="settingsPanel">
+        <div class="settings-toggle" id="settingsToggle">⚙</div>
+        <div class="settings-content">
+            <div class="settings-title">Motion Settings</div>
+            
+            <div class="setting-group">
+                <label class="setting-label">Frame Difference Mode</label>
+                <select id="frameDiffMode" class="setting-control">
+                    <option value="2">2 Frame Difference</option>
+                    <option value="3">3 Frame Difference</option>
+                </select>
+            </div>
+
+            <div class="setting-group">
+                <label class="setting-label">Stagnant Color</label>
+                <input type="color" id="stagnantColor" class="setting-control" value="#000000">
+            </div>
+
+            <div class="setting-group">
+                <label class="setting-label">Motion Color</label>
+                <input type="color" id="motionColor" class="setting-control" value="#ffffff">
+            </div>
+
+            <div class="setting-group">
+                <div class="checkbox-container">
+                    <input type="checkbox" id="markersEnabled" checked>
+                    <label class="setting-label" for="markersEnabled">Show Motion Markers</label>
+                </div>
+            </div>
+
+            <div class="setting-group">
+                <div class="checkbox-container">
+                    <input type="checkbox" id="velocityEnabled" checked>
+                    <label class="setting-label" for="velocityEnabled">Show Velocity Indicators</label>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        class HiddenMotionDetector {
+            constructor() {
+                this.canvas = document.getElementById('canvas');
+                this.ctx = this.canvas.getContext('2d');
+                this.video = document.createElement('video');
+                this.previousFrames = [];
+                this.currentFrame = null;
+                this.markers = [];
+                this.motionRegions = [];
+                
+                this.settings = {
+                    frameDiffMode: 2,
+                    stagnantColor: '#000000',
+                    motionColor: '#ffffff',
+                    markersEnabled: true,
+                    velocityEnabled: true
+                };
+
+                this.init();
+            }
+
+            init() {
+                this.setupCanvas();
+                this.setupSettings();
+                this.checkCameraPermission();
+            }
+
+            setupCanvas() {
+                this.canvas.width = window.innerWidth;
+                this.canvas.height = window.innerHeight;
+                
+                window.addEventListener('resize', () => {
+                    this.canvas.width = window.innerWidth;
+                    this.canvas.height = window.innerHeight;
+                });
+            }
+
+            setupSettings() {
+                const settingsToggle = document.getElementById('settingsToggle');
+                const settingsPanel = document.getElementById('settingsPanel');
+                
+                settingsToggle.addEventListener('click', () => {
+                    settingsPanel.classList.toggle('open');
+                });
+
+                // Setting controls
+                document.getElementById('frameDiffMode').addEventListener('change', (e) => {
+                    this.settings.frameDiffMode = parseInt(e.target.value);
+                });
+
+                document.getElementById('stagnantColor').addEventListener('change', (e) => {
+                    this.settings.stagnantColor = e.target.value;
+                });
+
+                document.getElementById('motionColor').addEventListener('change', (e) => {
+                    this.settings.motionColor = e.target.value;
+                });
+
+                document.getElementById('markersEnabled').addEventListener('change', (e) => {
+                    this.settings.markersEnabled = e.target.checked;
+                    this.updateMarkers();
+                });
+
+                document.getElementById('velocityEnabled').addEventListener('change', (e) => {
+                    this.settings.velocityEnabled = e.target.checked;
+                });
+            }
+
+            async checkCameraPermission() {
+                try {
+                    const stream = await navigator.mediaDevices.getUserMedia({ 
+                        video: { 
+                            width: { ideal: 1280 },
+                            height: { ideal: 720 },
+                            frameRate: { ideal: 30 }
+                        } 
+                    });
+                    
+                    this.video.srcObject = stream;
+                    this.video.play();
+                    
+                    document.getElementById('noCameraScreen').classList.add('hidden');
+                    
+                    this.video.addEventListener('loadedmetadata', () => {
+                        this.startProcessing();
+                    });
+                    
+                } catch (error) {
+                    console.log('Camera access denied or not available');
+                    // Keep the no-camera screen visible
+                }
+            }
+
+            startProcessing() {
+                const processFrame = () => {
+                    if (this.video.readyState === this.video.HAVE_ENOUGH_DATA) {
+                        this.captureFrame();
+                        this.processMotionDetection();
+                        this.render();
+                    }
+                    requestAnimationFrame(processFrame);
+                };
+                processFrame();
+            }
+
+            captureFrame() {
+                const tempCanvas = document.createElement('canvas');
+                const tempCtx = tempCanvas.getContext('2d');
+                
+                tempCanvas.width = this.video.videoWidth;
+                tempCanvas.height = this.video.videoHeight;
+                
+                tempCtx.drawImage(this.video, 0, 0);
+                
+                const imageData = tempCtx.getImageData(0, 0, tempCanvas.width, tempCanvas.height);
+                const grayData = this.convertToGrayscale(imageData);
+                
+                this.currentFrame = {
+                    data: grayData,
+                    width: tempCanvas.width,
+                    height: tempCanvas.height,
+                    timestamp: Date.now()
+                };
+                
+                this.previousFrames.push(this.currentFrame);
+                
+                const maxFrames = this.settings.frameDiffMode === 3 ? 3 : 2;
+                if (this.previousFrames.length > maxFrames) {
+                    this.previousFrames.shift();
+                }
+            }
+
+            convertToGrayscale(imageData) {
+                const data = imageData.data;
+                const grayData = new Uint8Array(data.length / 4);
+                
+                for (let i = 0; i < data.length; i += 4) {
+                    const gray = Math.round(0.299 * data[i] + 0.587 * data[i + 1] + 0.114 * data[i + 2]);
+                    grayData[i / 4] = gray;
+                }
+                
+                return grayData;
+            }
+
+            processMotionDetection() {
+                if (this.previousFrames.length < this.settings.frameDiffMode) return;
+                
+                const current = this.previousFrames[this.previousFrames.length - 1];
+                const previous = this.previousFrames[this.previousFrames.length - this.settings.frameDiffMode];
+                
+                const diffData = new Uint8Array(current.data.length);
+                const threshold = 30; // Sensitivity threshold
+                
+                for (let i = 0; i < current.data.length; i++) {
+                    const diff = Math.abs(current.data[i] - previous.data[i]);
+                    diffData[i] = diff > threshold ? 255 : 0;
+                }
+                
+                this.motionData = {
+                    data: diffData,
+                    width: current.width,
+                    height: current.height
+                };
+                
+                if (this.settings.markersEnabled) {
+                    this.detectMotionRegions();
+                }
+            }
+
+            detectMotionRegions() {
+                if (!this.motionData) return;
+                
+                const regions = [];
+                const visited = new Set();
+                const { data, width, height } = this.motionData;
+                
+                for (let y = 0; y < height; y += 10) { // Sample every 10 pixels for performance
+                    for (let x = 0; x < width; x += 10) {
+                        const index = y * width + x;
+                        
+                        if (data[index] > 0 && !visited.has(index)) {
+                            const region = this.floodFillRegion(x, y, width, height, data, visited);
+                            if (region.pixels > 50) { // Minimum region size
+                                regions.push(region);
+                            }
+                        }
+                    }
+                }
+                
+                this.updateMotionMarkers(regions);
+            }
+
+            floodFillRegion(startX, startY, width, height, data, visited) {
+                const stack = [[startX, startY]];
+                const region = { minX: startX, minY: startY, maxX: startX, maxY: startY, pixels: 0 };
+                
+                while (stack.length > 0) {
+                    const [x, y] = stack.pop();
+                    const index = y * width + x;
+                    
+                    if (x < 0 || x >= width || y < 0 || y >= height || 
+                        visited.has(index) || data[index] === 0) {
+                        continue;
+                    }
+                    
+                    visited.add(index);
+                    region.pixels++;
+                    region.minX = Math.min(region.minX, x);
+                    region.minY = Math.min(region.minY, y);
+                    region.maxX = Math.max(region.maxX, x);
+                    region.maxY = Math.max(region.maxY, y);
+                    
+                    // Add neighboring pixels
+                    stack.push([x + 10, y], [x - 10, y], [x, y + 10], [x, y - 10]);
+                }
+                
+                return region;
+            }
+
+            updateMotionMarkers(regions) {
+                // Remove existing markers
+                document.querySelectorAll('.marker, .velocity-indicator').forEach(el => el.remove());
+                
+                if (!this.settings.markersEnabled) return;
+                
+                const scaleX = this.canvas.width / this.motionData.width;
+                const scaleY = this.canvas.height / this.motionData.height;
+                
+                regions.forEach((region, index) => {
+                    const marker = document.createElement('div');
+                    marker.className = 'marker';
+                    
+                    const x = region.minX * scaleX;
+                    const y = region.minY * scaleY;
+                    const w = (region.maxX - region.minX) * scaleX;
+                    const h = (region.maxY - region.minY) * scaleY;
+                    
+                    marker.style.left = x + 'px';
+                    marker.style.top = y + 'px';
+                    marker.style.width = w + 'px';
+                    marker.style.height = h + 'px';
+                    
+                    document.body.appendChild(marker);
+                    
+                    // Add velocity indicator if enabled
+                    if (this.settings.velocityEnabled && this.previousMotionRegions) {
+                        this.addVelocityIndicator(region, index, x + w/2, y + h/2);
+                    }
+                });
+                
+                this.previousMotionRegions = regions;
+            }
+
+            addVelocityIndicator(currentRegion, index, centerX, centerY) {
+                if (!this.previousMotionRegions[index]) return;
+                
+                const prevRegion = this.previousMotionRegions[index];
+                const scaleX = this.canvas.width / this.motionData.width;
+                const scaleY = this.canvas.height / this.motionData.height;
+                
+                const prevCenterX = (prevRegion.minX + prevRegion.maxX) / 2 * scaleX;
+                const prevCenterY = (prevRegion.minY + prevRegion.maxY) / 2 * scaleY;
+                
+                const deltaX = centerX - prevCenterX;
+                const deltaY = centerY - prevCenterY;
+                const distance = Math.sqrt(deltaX * deltaX + deltaY * deltaY);
+                
+                if (distance > 5) { // Minimum movement threshold
+                    const indicator = document.createElement('div');
+                    indicator.className = 'velocity-indicator';
+                    
+                    const angle = Math.atan2(deltaY, deltaX) * 180 / Math.PI;
+                    
+                    indicator.style.left = prevCenterX + 'px';
+                    indicator.style.top = prevCenterY + 'px';
+                    indicator.style.height = Math.min(distance, 100) + 'px';
+                    indicator.style.transform = `rotate(${angle + 90}deg)`;
+                    
+                    document.body.appendChild(indicator);
+                }
+            }
+
+            updateMarkers() {
+                const markers = document.querySelectorAll('.marker, .velocity-indicator');
+                markers.forEach(marker => {
+                    marker.style.display = this.settings.markersEnabled ? 'block' : 'none';
+                });
+            }
+
+            render() {
+                if (!this.motionData) return;
+                
+                this.ctx.fillStyle = this.settings.stagnantColor;
+                this.ctx.fillRect(0, 0, this.canvas.width, this.canvas.height);
+                
+                const imageData = this.ctx.createImageData(this.canvas.width, this.canvas.height);
+                const data = imageData.data;
+                
+                const scaleX = this.motionData.width / this.canvas.width;
+                const scaleY = this.motionData.height / this.canvas.height;
+                
+                // Parse colors
+                const stagnantRGB = this.hexToRgb(this.settings.stagnantColor);
+                const motionRGB = this.hexToRgb(this.settings.motionColor);
+                
+                for (let y = 0; y < this.canvas.height; y++) {
+                    for (let x = 0; x < this.canvas.width; x++) {
+                        const sourceX = Math.floor(x * scaleX);
+                        const sourceY = Math.floor(y * scaleY);
+                        const sourceIndex = sourceY * this.motionData.width + sourceX;
+                        
+                        const canvasIndex = (y * this.canvas.width + x) * 4;
+                        
+                        if (this.motionData.data[sourceIndex] > 0) {
+                            data[canvasIndex] = motionRGB.r;
+                            data[canvasIndex + 1] = motionRGB.g;
+                            data[canvasIndex + 2] = motionRGB.b;
+                        } else {
+                            data[canvasIndex] = stagnantRGB.r;
+                            data[canvasIndex + 1] = stagnantRGB.g;
+                            data[canvasIndex + 2] = stagnantRGB.b;
+                        }
+                        data[canvasIndex + 3] = 255;
+                    }
+                }
+                
+                this.ctx.putImageData(imageData, 0, 0);
+            }
+
+            hexToRgb(hex) {
+                const result = /^#?([a-f\d]{2})([a-f\d]{2})([a-f\d]{2})$/i.exec(hex);
+                return result ? {
+                    r: parseInt(result[1], 16),
+                    g: parseInt(result[2], 16),
+                    b: parseInt(result[3], 16)
+                } : { r: 0, g: 0, b: 0 };
+            }
+        }
+
+        // Initialize the application
+        new HiddenMotionDetector();
+    </script>
+</body>
+</html>
