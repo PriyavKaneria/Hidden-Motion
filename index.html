@@ -236,13 +236,9 @@
         }
 
         .trail-line {
-            position: absolute;
-            pointer-events: none;
-            z-index: 99;
             stroke: #20b2aa;
             stroke-width: 2;
             fill: none;
-            opacity: 0.8;
             filter: drop-shadow(0 0 3px rgba(32, 178, 170, 0.6));
         }
 
@@ -443,9 +439,10 @@
                 this.markers = [];
                 this.motionRegions = [];
                 this.trailSvg = null;
-                this.averageTrailPoints = []; // Array to hold historical average centers
-                this.frameCount = 0; // Frame counter
-                this.trailUpdateInterval = 5; // Add trail point every 5 frames
+                this.trailPoints = [];
+                this.frameCounter = 0;
+                this.trailUpdateInterval = 5;
+                this.lastTrailUpdateFrame = 0;
                 this.smoothedVelocities = { x: 0, y: 0 };
                 this.isPlaying = true;
                 this.animationId = null;
@@ -489,7 +486,6 @@
                 this.trailSvg.style.height = '100vh';
                 this.trailSvg.style.pointerEvents = 'none';
                 this.trailSvg.style.zIndex = '99';
-                this.trailSvg.style.transform = 'scaleX(-1)';
                 document.body.appendChild(this.trailSvg);
             }
 
@@ -592,7 +588,7 @@
                         this.captureFrame();
                         this.processMotionDetection();
                         this.render();
-                        this.frameCount++; // Increment frame counter
+                        this.frameCounter++;
                         this.hueRotation = (this.hueRotation + 2) % 360;
                     }
                     this.animationId = requestAnimationFrame(processFrame);
@@ -737,7 +733,7 @@
 
                         const marker = document.createElement('div');
                         marker.className = 'marker';
-                        marker.style.right = x + 'px';
+                        marker.style.left = (this.canvas.width - (x + w)) + 'px';
                         marker.style.top = y + 'px';
                         marker.style.width = w + 'px';
                         marker.style.height = h + 'px';
@@ -756,7 +752,7 @@
                         const info = document.createElement('div');
                         info.className = 'marker-info';
                         info.innerHTML = `X = ${Math.round(centerX)}<br>Y = ${Math.round(centerY)}<br>Speed = ${Math.round(velocity.speed)}`;
-                        marker.appendChild(info);
+                        marker.append(info);
 
                         document.body.appendChild(marker);
 
@@ -768,11 +764,14 @@
                     const avgX = sumX / regions.length;
                     const avgY = sumY / regions.length;
 
-                    if (this.frameCount % this.trailUpdateInterval === 0) {
-                        this.averageTrailPoints.push({ x: avgX, y: avgY, frame: this.frameCount });
-                        if (this.averageTrailPoints.length > 50) {
-                            this.averageTrailPoints.shift();
+                    if (this.frameCounter % this.trailUpdateInterval === 0) {
+                        const x_displayed = this.canvas.width - avgX;
+                        const y_displayed = avgY;
+                        this.trailPoints.push({ x: x_displayed, y: y_displayed, frame: this.frameCounter });
+                        if (this.trailPoints.length > 50) {
+                            this.trailPoints.shift();
                         }
+                        this.lastTrailUpdateFrame = this.frameCounter;
                     }
                 }
 
@@ -781,28 +780,28 @@
             }
 
             updateTrail() {
-                // Remove points older than 60 frames
-                this.averageTrailPoints = this.averageTrailPoints.filter(point => this.frameCount - point.frame <= 60);
+                this.trailSvg.innerHTML = '';
+                if (this.trailPoints.length < 2) return;
 
-                // Clear existing trail paths
-                while (this.trailSvg.firstChild) {
-                    this.trailSvg.removeChild(this.trailSvg.firstChild);
-                }
+                const framesSinceUpdate = this.frameCounter - this.lastTrailUpdateFrame;
+                const opacity = Math.max(0, 1 - framesSinceUpdate / 60);
 
-                // Draw trail segments
-                for (let i = 1; i < this.averageTrailPoints.length; i++) {
-                    const p1 = this.averageTrailPoints[i - 1];
-                    const p2 = this.averageTrailPoints[i];
-                    const age = this.frameCount - p2.frame;
-                    const opacity = Math.max(0, 1 - age / 60); // Fade out over 60 frames
-
-                    if (opacity > 0) {
-                        const path = document.createElementNS('http://www.w3.org/2000/svg', 'path');
-                        path.setAttribute('d', `M ${p1.x} ${p1.y} L ${p2.x} ${p2.y}`);
-                        path.classList.add('trail-line');
-                        path.style.opacity = opacity;
-                        this.trailSvg.appendChild(path);
+                if (opacity > 0) {
+                    let pathData = `M ${this.trailPoints[0].x} ${this.trailPoints[0].y}`;
+                    if (this.trailPoints.length >= 3) {
+                        pathData += ` Q ${this.trailPoints[1].x} ${this.trailPoints[1].y} ${this.trailPoints[2].x} ${this.trailPoints[2].y}`;
+                        for (let i = 3; i < this.trailPoints.length; i++) {
+                            pathData += ` T ${this.trailPoints[i].x} ${this.trailPoints[i].y}`;
+                        }
+                    } else {
+                        pathData += ` L ${this.trailPoints[1].x} ${this.trailPoints[1].y}`;
                     }
+
+                    const path = document.createElementNS('http://www.w3.org/2000/svg', 'path');
+                    path.setAttribute('d', pathData);
+                    path.classList.add('trail-line');
+                    path.style.opacity = opacity;
+                    this.trailSvg.appendChild(path);
                 }
             }
 
@@ -823,11 +822,12 @@
                     const indicator = document.createElement('div');
                     indicator.className = 'velocity-indicator';
 
-                    const angle = Math.atan2(smoothedVelocities.y, smoothedVelocities.x) * 180 / Math.PI;
-
-                    indicator.style.left = centerX + 'px';
+                    const x_displayed = this.canvas.width - centerX;
+                    indicator.style.left = x_displayed + 'px';
                     indicator.style.top = (centerY - Math.min(distance * 2, 60)) + 'px';
                     indicator.style.height = Math.min(distance * 2, 60) + 'px';
+
+                    const angle = Math.atan2(smoothedVelocities.y, -smoothedVelocities.x) * 180 / Math.PI;
                     indicator.style.transform = `rotate(${angle + 90}deg)`;
 
                     if (this.settings.hsvMode) {
@@ -937,120 +937,11 @@
             }
         }
 
-        class MotionTracker {
-            constructor(canvas, trailSvg) {
-                this.canvas = canvas;
-                this.trailSvg = trailSvg;
-                this.markers = new Map();
-                this.smoothedVelocities = new Map();
-                this.averageTrailPoints = [];
-                this.frameCount = 0;
-                this.trailUpdateInterval = 5;
-                this.lastTrailUpdateFrame = 0;
-            }
-
-            updateMotionMarkers(motionData) {
-                this.frameCount++;
-                const scaleX = this.canvas.width / motionData.width;
-                const scaleY = this.canvas.height / motionData.height;
-
-                motionData.regions.forEach(region => {
-                    const x = region.minX * scaleX;
-                    const w = (region.maxX - region.minX) * scaleX;
-                    const y = region.minY * scaleY;
-                    const h = (region.maxY - region.minY) * scaleY;
-                    const centerX = x + w / 2;
-                    const centerY = y + h / 2;
-
-                    let marker = this.markers.get(region.id);
-                    if (!marker) {
-                        marker = document.createElement('div');
-                        marker.className = 'marker';
-                        document.body.appendChild(marker);
-                        this.markers.set(region.id, marker);
-                        this.smoothedVelocities.set(region.id, { x: 0, y: 0, prevCenterX: centerX, prevCenterY: centerY });
-                    }
-
-                    // Position marker in flipped coordinate system
-                    marker.style.left = (this.canvas.width - (x + w)) + 'px';
-                    marker.style.top = y + 'px';
-                    marker.style.width = w + 'px';
-                    marker.style.height = h + 'px';
-
-                    const velocityData = this.smoothedVelocities.get(region.id);
-                    const velocity = {
-                        x: centerX - velocityData.prevCenterX,
-                        y: centerY - velocityData.prevCenterY
-                    };
-
-                    // Smooth velocity (example using simple exponential smoothing)
-                    velocityData.x = velocityData.x * 0.8 + velocity.x * 0.2;
-                    velocityData.y = velocityData.y * 0.8 + velocity.y * 0.2;
-                    velocityData.prevCenterX = centerX;
-                    velocityData.prevCenterY = centerY;
-
-                    this.addSmoothedVelocityIndicator(region.id, centerX, centerY, velocityData);
-
-                    // Update trail with average position
-                    if (this.frameCount % this.trailUpdateInterval === 0) {
-                        this.averageTrailPoints.push({ x: centerX, y: centerY, frame: this.frameCount });
-                        this.lastTrailUpdateFrame = this.frameCount;
-                        if (this.averageTrailPoints.length > 50) {
-                            this.averageTrailPoints.shift();
-                        }
-                        this.updateTrail();
-                    }
-                });
-            }
-
-            addSmoothedVelocityIndicator(id, centerX, centerY, smoothedVelocities) {
-                const magnitude = Math.sqrt(smoothedVelocities.x ** 2 + smoothedVelocities.y ** 2);
-                if (magnitude < 1) return;
-
-                const height = Math.min(magnitude * 2, 50);
-                const indicator = document.createElement('div');
-                indicator.className = 'velocity-indicator';
-
-                // Position in flipped coordinate system
-                indicator.style.left = (this.canvas.width - centerX) + 'px';
-                indicator.style.top = (centerY - height) + 'px';
-                indicator.style.height = height + 'px';
-
-                // Invert x-velocity for flipped feed
-                const angle = Math.atan2(smoothedVelocities.y, -smoothedVelocities.x) * 180 / Math.PI;
-                indicator.style.transform = `rotate(${angle + 90}deg)`;
-
-                document.body.appendChild(indicator);
-                setTimeout(() => indicator.remove(), 100);
-            }
-
-            updateTrail() {
-                this.trailSvg.innerHTML = ''; // Clear previous trails
-                const framesSinceUpdate = this.frameCount - this.lastTrailUpdateFrame;
-                const opacity = Math.max(0, 1 - framesSinceUpdate / 60);
-
-                if (opacity > 0 && this.averageTrailPoints.length >= 2) {
-                    let pathData = `M ${this.averageTrailPoints[0].x} ${this.averageTrailPoints[0].y}`;
-                    if (this.averageTrailPoints.length >= 3) {
-                        pathData += ` Q ${this.averageTrailPoints[1].x} ${this.averageTrailPoints[1].y} ${this.averageTrailPoints[2].x} ${this.averageTrailPoints[2].y}`;
-                        for (let i = 3; i < this.averageTrailPoints.length; i++) {
-                            pathData += ` T ${this.averageTrailPoints[i].x} ${this.averageTrailPoints[i].y}`;
-                        }
-                    } else {
-                        pathData += ` L ${this.averageTrailPoints[1].x} ${this.averageTrailPoints[1].y}`;
-                    }
-
-                    const path = document.createElementNS('http://www.w3.org/2000/svg', 'path');
-                    path.setAttribute('d', pathData);
-                    path.classList.add('trail-line');
-                    path.style.opacity = opacity;
-                    this.trailSvg.appendChild(path);
-                }
-            }
-        }
-
         new HiddenMotionDetector();
 
+    </script>
+
+    <script>
         const canvas = document.createElement("canvas");
         const ctx = canvas.getContext("2d");
         document.body.appendChild(canvas);
