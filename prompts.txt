@@ -1,0 +1,25 @@
+-- model : Claude Sonnet 4 (free tier)
+
+-- prompt 0
+make me a website with these simple requirements
+* Hidden motion is the title and written in architectural font in white in top left corner, title is not mouse intractable
+* complete screen is a canvas without any scroll
+* a floating setting panel (foldable to the right edge) with all the changable params
+* first we check if we have user camera permission
+   * if we don't we show a blank black canvas with 2 images I'll configure later and some text describing those images, and one arrow pointing to the general direction where the allow camera option will come in browsers
+   * once we have access to camera we simple start processing and showing results
+* the main processing is the fact that having 2 frame or 3 frame difference can show us hidden motion that is usually invisible, the canvas will show a black and white feed of frame diff, white being the diff. frames are updated as fast as possible
+* the settings are like
+   * 2 frame diff or 3 frame diff
+   * colour palette of stagnant and motion part
+   * markers (enabled by default) show a small square wherever something is changed as a group, possibly also showing velocity if it is continuously moving as a object
+
+-- prompt 1
+Nice some improvements I would want
+* A big stop and play button to stop the camera and processing
+* The velocity vectors and blobs can have some math applied to smooth general direction and path and have trails
+* a color setting that if enabled changes the movement color to rgb rotating hues cycling like animation smooth
+* a nice action button below the settings panel saying add your own setting and github icon that opens the github repo
+* a text in footer saying "one of many experiments, made with love by @_diginova" where many links to "projects.priyavkaneria.com" and @_diginova links to x.com/_diginova
+* also the color of the bounding box can be also white but maybe with a black outline to the outline if that looks good
+
