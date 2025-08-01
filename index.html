@@ -340,6 +340,7 @@
             color: white;
         }
     </style>
+    <script defer src="https://umami-sable-xi.vercel.app/script.js" data-website-id="944d4d50-af91-4ab2-acf6-6f25adf38a61"></script>
 </head>
 
 <body>
@@ -941,6 +942,10 @@
         canvas.width = window.innerWidth;
         canvas.height = window.innerHeight;
         canvas.style = "display: block; position: absolute; top: 0; z-index: -1;"
+        window.addEventListener('resize', function () {
+            canvas.width = window.innerWidth;
+            canvas.height = window.innerHeight;
+        })
 
         document.body.style.margin = "0";
         document.body.style.overflow = "hidden";
