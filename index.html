@@ -139,7 +139,6 @@
             left: 0;
             width: 100vw;
             height: 100vh;
-            background: rgba(0, 0, 0, 0.9);
             display: flex;
             flex-direction: column;
             align-items: center;
@@ -152,13 +151,13 @@
             display: flex;
             gap: 40px;
             margin-bottom: 30px;
+            user-select: none;
         }
 
-        .camera-placeholder {
-            width: 200px;
-            height: 150px;
+        .camera-images img{
+            width: 500px;
             background: rgba(51, 51, 51, 0.8);
-            border: 2px dashed #666;
+            border: 2px dashed #a9a9a9;
             display: flex;
             align-items: center;
             justify-content: center;
@@ -340,7 +339,8 @@
             color: white;
         }
     </style>
-    <script defer src="https://umami-sable-xi.vercel.app/script.js" data-website-id="944d4d50-af91-4ab2-acf6-6f25adf38a61"></script>
+    <script defer src="https://umami-sable-xi.vercel.app/script.js"
+        data-website-id="944d4d50-af91-4ab2-acf6-6f25adf38a61"></script>
 </head>
 
 <body>
@@ -350,14 +350,7 @@
 
     <div class="no-camera-screen" id="noCameraScreen">
         <div class="camera-images">
-            <div class="camera-placeholder">
-                Normal View<br>
-                <small>Static scene appears unchanged</small>
-            </div>
-            <div class="camera-placeholder">
-                Motion Detection<br>
-                <small>Hidden movements revealed</small>
-            </div>
+            <img src="/demo.png">
         </div>
         <div class="camera-description">
             This application reveals hidden motion by analyzing frame differences in your camera feed.
@@ -365,7 +358,7 @@
             background.
             Please allow camera access to begin motion detection.
         </div>
-        <div class="camera-arrow">↗</div>
+        <div class="camera-arrow">↖</div>
     </div>
 
     <div class="play-pause-btn" id="playPauseBtn">⏸</div>
